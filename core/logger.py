@@ -120,11 +120,46 @@ class Logger:
         if Logger._initialized:
             return
 
-        # Lista na komunikaty inicjalizacyjne
+        # Lista na komunikaty inicjalizacyjne z dodatkowym poziomem szczegółowości
         init_messages: List[str] = []
-        is_init_successful = True  # Flaga powodzenia inicjalizacji
+        is_init_successful = True
 
         try:
+            # Dodaj więcej szczegółowego debugowania
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            print(f"[DEBUG] Script directory: {script_dir}")  # Wydruk ścieżki skryptu
+            print(f"[DEBUG] Pliki w katalogu: {os.listdir(script_dir)}")  # Lista plików
+
+            # Sprawdzenie plików kontrolnych z bardziej szczegółowym logowaniem
+            level_files = {
+                "INFO": Logger.LOG_MODE_INFO,
+                "DEBUG": Logger.LOG_MODE_DEBUG,
+                "CRITICAL": Logger.LOG_MODE_CRITICAL,
+            }
+
+            initial_mode = Logger.DEFAULT_LOG_MODE
+            file_logging_enabled = False
+
+            for filename, mode in level_files.items():
+                # Sprawdzaj zarówno plik bez sufiksu, jak i z sufiksem _LOG
+                for suffix in ["", Logger.LOG_FILE_SUFFIX]:
+                    filepath = os.path.join(script_dir, filename + suffix)
+                    print(f"[DEBUG] Sprawdzanie pliku: {filepath}")
+
+                    try:
+                        if os.path.isfile(filepath) and os.path.getsize(filepath) == 0:
+                            print(f"[DEBUG] Znaleziono plik kontrolny: {filepath}")
+                            initial_mode = mode
+                            file_logging_enabled = suffix == Logger.LOG_FILE_SUFFIX
+                            break
+                    except Exception as e:
+                        print(f"[DEBUG] Błąd podczas sprawdzania pliku {filepath}: {e}")
+
+            init_messages.append(f"Początkowy tryb logowania: {initial_mode}")
+            init_messages.append(
+                f"Logowanie do pliku: {'WŁĄCZONE' if file_logging_enabled else 'WYŁĄCZONE'}"
+            )
+
             self.logger = logging.getLogger("logger")
             self.log_file: Optional[str] = None
             self.console_handler: Optional[logging.Handler] = None
@@ -133,71 +168,9 @@ class Logger:
             # Dodaj informację o wersji do komunikatów inicjalizacyjnych
             init_messages.append(f"Inicjalizacja Logger_LIB wersja {Logger.VERSION}")
 
-            script_dir = os.path.dirname(os.path.abspath(__file__))
             self.log_dir = os.path.join(
                 os.path.dirname(script_dir), Logger.LOG_DIRECTORY
             )
-
-            # --- Logika ustalania początkowego trybu logowania i włączenia logowania do pliku ---
-            initial_mode = (
-                Logger.LOG_MODE_NONE
-            )  # Domyślnie NONE jeśli nie znaleziono pliku
-            mode_source = f"brak pliku kontrolnego (tryb: {Logger.LOG_MODE_NONE})"
-            file_logging_enabled = False
-
-            level_files = {
-                "INFO": Logger.LOG_MODE_INFO,
-                "DEBUG": Logger.LOG_MODE_DEBUG,
-                "CRITICAL": Logger.LOG_MODE_CRITICAL,
-            }
-
-            # Najpierw sprawdź pliki z sufiksem _LOG, które włączają tryb logowania i logowanie do pliku
-            for filename, mode in level_files.items():
-                log_filepath = os.path.join(
-                    script_dir, filename + Logger.LOG_FILE_SUFFIX
-                )
-                try:
-                    if (
-                        os.path.isfile(log_filepath)
-                        and os.path.getsize(log_filepath) == 0
-                    ):
-                        initial_mode = mode
-                        file_logging_enabled = True
-                        mode_source = f"plik kontrolny '{filename}{Logger.LOG_FILE_SUFFIX}' (tryb: {mode}, logowanie do pliku: włączone)"
-                        init_messages.append(
-                            f"Znaleziono plik kontrolny '{filename}{Logger.LOG_FILE_SUFFIX}'. Ustawiono tryb na: {mode} z logowaniem do pliku."
-                        )
-                        break
-                except OSError as e:
-                    init_messages.append(
-                        f"Ostrzeżenie: Nie można sprawdzić pliku '{log_filepath}': {e}."
-                    )
-                except Exception as e:
-                    init_messages.append(
-                        f"Ostrzeżenie: Niespodziewany błąd podczas sprawdzania pliku '{log_filepath}': {e}."
-                    )
-
-            # Jeśli nie znaleziono pliku z sufiksem _LOG, sprawdź zwykłe pliki (bez logowania do pliku)
-            if initial_mode == Logger.LOG_MODE_NONE:
-                for filename, mode in level_files.items():
-                    filepath = os.path.join(script_dir, filename)
-                    try:
-                        if os.path.isfile(filepath) and os.path.getsize(filepath) == 0:
-                            initial_mode = mode
-                            file_logging_enabled = False
-                            mode_source = f"plik kontrolny '{filename}' (tryb: {mode}, logowanie do pliku: wyłączone)"
-                            init_messages.append(
-                                f"Znaleziono plik kontrolny '{filename}'. Ustawiono tryb na: {mode} bez logowania do pliku."
-                            )
-                            break
-                    except OSError as e:
-                        init_messages.append(
-                            f"Ostrzeżenie: Nie można sprawdzić pliku '{filepath}': {e}."
-                        )
-                    except Exception as e:
-                        init_messages.append(
-                            f"Ostrzeżenie: Niespodziewany błąd podczas sprawdzania pliku '{filepath}': {e}."
-                        )
 
             # Ustawienie zmiennej klasowej i instancji
             Logger.FILE_LOGGING_ENABLED = file_logging_enabled
@@ -207,7 +180,7 @@ class Logger:
             )
 
             init_messages.append(
-                f"Początkowy tryb logowania ({initial_mode}) ustalony na podstawie: {mode_source}."
+                f"Początkowy tryb logowania ({initial_mode}) ustalony na podstawie: {file_logging_enabled}."
             )
 
             self._configure_basic_logger()
@@ -428,15 +401,30 @@ class Logger:
         return True
 
     def set_logging_mode(self, mode: Union[int, str]) -> bool:
-        """
-        Ustawia tryb logowania.
+        """Ustawia tryb logowania."""
+        # Jeśli tryb DEFAULT_LOG_MODE, sprawdź ponownie pliki kontrolne
+        if mode == Logger.DEFAULT_LOG_MODE:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            print(f"[DEBUG] Sprawdzanie plików kontrolnych w katalogu: {script_dir}")
 
-        Args:
-            mode: Tryb logowania (LOG_MODE_NONE, LOG_MODE_INFO, LOG_MODE_DEBUG, LOG_MODE_CRITICAL)
+            level_files = {
+                "INFO": Logger.LOG_MODE_INFO,
+                "DEBUG": Logger.LOG_MODE_DEBUG,
+                "CRITICAL": Logger.LOG_MODE_CRITICAL,
+            }
 
-        Returns:
-            bool: True, jeśli operacja się powiodła; False w przeciwnym razie
-        """
+            for filename, new_mode in level_files.items():
+                for suffix in ["", Logger.LOG_FILE_SUFFIX]:
+                    filepath = os.path.join(script_dir, filename + suffix)
+                    try:
+                        if os.path.isfile(filepath) and os.path.getsize(filepath) == 0:
+                            print(f"[DEBUG] Znaleziono plik kontrolny: {filepath}")
+                            mode = new_mode
+                            self.set_file_logging(suffix == Logger.LOG_FILE_SUFFIX)
+                            break
+                    except Exception as e:
+                        print(f"[DEBUG] Błąd podczas sprawdzania pliku {filepath}: {e}")
+
         if mode == self.logging_mode:
             return True  # Nic się nie zmienia
 
