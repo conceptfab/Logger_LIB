@@ -366,7 +366,16 @@ class Logger:
             # Format nazwy po rotacji: log.log.YYYY-MM-DD
             self.file_handler.suffix = "%Y-%m-%d"
 
-            self.file_handler.setLevel(logging.DEBUG)
+            # Ustaw poziom na podstawie aktualnego trybu logowania
+            if self.logging_mode in [
+                Logger.LOG_MODE_INFO,
+                Logger.LOG_MODE_DEBUG,
+                Logger.LOG_MODE_CRITICAL,
+            ]:
+                self.file_handler.setLevel(logging.DEBUG)
+            else:
+                self.file_handler.setLevel(logging.CRITICAL + 1)
+
             self.file_handler.setFormatter(formatter)
             self.logger.addHandler(self.file_handler)
 
@@ -453,7 +462,15 @@ class Logger:
 
         # Jeśli mamy file_handler, ustaw jego poziom
         if self.file_handler:
-            if mode in [Logger.LOG_MODE_DEBUG, Logger.LOG_MODE_CRITICAL]:
+            if (
+                mode
+                in [
+                    Logger.LOG_MODE_INFO,
+                    Logger.LOG_MODE_DEBUG,
+                    Logger.LOG_MODE_CRITICAL,
+                ]
+                and self.file_logging_enabled
+            ):
                 self.file_handler.setLevel(logging.DEBUG)
             else:
                 self.file_handler.setLevel(logging.CRITICAL + 1)
