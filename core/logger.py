@@ -1,7 +1,7 @@
 """
 Biblioteka Logger_LIB - zaawansowany system logowania dla aplikacji Python.
 
-Wersja: 0.2
+Wersja: 0.2x
 
 Biblioteka implementuje wzorzec Singleton do centralnego zarządzania logowaniem.
 Oferuje następujące funkcjonalności:
