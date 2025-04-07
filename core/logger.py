@@ -67,7 +67,7 @@ class Logger:
     # Stałe konfiguracyjne jako ClassVar
     _instance: ClassVar[Optional["Logger"]] = None
     _initialized: ClassVar[bool] = False
-    VERSION: ClassVar[str] = "0.22"
+    VERSION: ClassVar[str] = "0.25"
 
     # Stałe konfiguracyjne
     LOG_MODE_NONE: ClassVar[int] = 0
@@ -445,9 +445,14 @@ class Logger:
                 Logger.LOG_MODE_INFO,
                 Logger.LOG_MODE_DEBUG,
                 Logger.LOG_MODE_CRITICAL,
+                "ERROR",  # Dodanie obsługi trybu ERROR dla wstecznej kompatybilności
             ]:
                 print(f"Nieznany tryb logowania: {mode}")
                 return False
+
+            # Obsługa trybu ERROR (mapowanie na tryb DEBUG)
+            if mode == "ERROR":
+                mode = Logger.LOG_MODE_DEBUG  # Traktuj ERROR tak samo jak DEBUG
 
             # Ustawienie trybu
             self.logging_mode = mode
