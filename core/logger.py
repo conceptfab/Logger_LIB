@@ -1,3 +1,18 @@
+"""
+Biblioteka Logger_LIB - zaawansowany system logowania dla aplikacji Python.
+
+Wersja: 0.2
+
+Biblioteka implementuje wzorzec Singleton do centralnego zarządzania logowaniem.
+Oferuje następujące funkcjonalności:
+- Elastyczne poziomy logowania (NONE, INFO, DEBUG, CRITICAL)
+- Logowanie do konsoli z różnymi formatami w zależności od poziomu
+- Logowanie do pliku z automatyczną rotacją dzienną
+- Obsługa różnych formatów wiadomości
+- Bezpieczne zarządzanie zasobami
+- Informacje o pliku i numerze linii w logach
+"""
+
 # logger.py
 import datetime
 import io
@@ -52,6 +67,7 @@ class Logger:
     # Stałe konfiguracyjne jako ClassVar
     _instance: ClassVar[Optional["Logger"]] = None
     _initialized: ClassVar[bool] = False
+    VERSION: ClassVar[str] = "0.2"
 
     # Stałe konfiguracyjne
     LOG_MODE_NONE: ClassVar[int] = 0
@@ -110,6 +126,9 @@ class Logger:
             self.log_file: Optional[str] = None
             self.console_handler: Optional[logging.Handler] = None
             self.file_handler: Optional[logging.Handler] = None
+
+            # Dodaj informację o wersji do komunikatów inicjalizacyjnych
+            init_messages.append(f"Inicjalizacja Logger_LIB wersja {Logger.VERSION}")
 
             script_dir = os.path.dirname(os.path.abspath(__file__))
             self.log_dir = os.path.join(
