@@ -67,7 +67,7 @@ class Logger:
     # Stałe konfiguracyjne jako ClassVar
     _instance: ClassVar[Optional["Logger"]] = None
     _initialized: ClassVar[bool] = False
-    VERSION: ClassVar[str] = "0.2"
+    VERSION: ClassVar[str] = "0.21"
 
     # Stałe konfiguracyjne
     LOG_MODE_NONE: ClassVar[int] = 0
@@ -80,9 +80,7 @@ class Logger:
         False  # Domyślnie logowanie do pliku wyłączone
     )
 
-    DEFAULT_LOG_MODE: ClassVar[Union[int, str]] = (
-        LOG_MODE_CRITICAL  # Domyślny tryb, jeśli plik kontrolny nie zostanie znaleziony
-    )
+    DEFAULT_LOG_MODE: ClassVar[Union[int, str]] = LOG_MODE_NONE  # Domyślny tryb (NONE)
     LOG_DIRECTORY: ClassVar[str] = "logs"
     LOG_FILENAME_PREFIX: ClassVar[str] = "log"
 
@@ -413,6 +411,9 @@ class Logger:
                 "CRITICAL": Logger.LOG_MODE_CRITICAL,
             }
 
+            # Użyj mode = Logger.LOG_MODE_NONE jako wartości domyślnej, jeśli nie znajdziemy plików
+            mode = Logger.LOG_MODE_NONE
+
             for filename, new_mode in level_files.items():
                 for suffix in ["", Logger.LOG_FILE_SUFFIX]:
                     filepath = os.path.join(script_dir, filename + suffix)
@@ -425,49 +426,26 @@ class Logger:
                     except Exception as e:
                         print(f"[DEBUG] Błąd podczas sprawdzania pliku {filepath}: {e}")
 
-        if mode == self.logging_mode:
-            return True  # Nic się nie zmienia
-
-        old_mode = self.logging_mode
+        # Ustaw nowy tryb logowania
         self.logging_mode = mode
 
-        # Loguj zmianę jako DEBUG (tylko do konsoli)
-        if self.console_handler and old_mode != Logger.LOG_MODE_NONE:
-            self.logger.debug(
-                f"Zmieniono tryb logowania z '{old_mode}' na '{mode}'",
-                stacklevel=Logger.STACKLEVEL + 1,
-            )
+        # Jeśli tryb to NONE, wyłącz wszystkie handlery
+        if mode == Logger.LOG_MODE_NONE:
+            if self.console_handler:
+                self.console_handler.setLevel(logging.CRITICAL + 1)
+            if self.file_handler:
+                self.file_handler.setLevel(logging.CRITICAL + 1)
+            return True
 
-        # Ustaw poziom logowania
+        # Ustaw odpowiedni poziom dla konsoli
         self._set_logging_level_for_mode(mode)
 
-        # --- Konfiguracja Handlera Pliku ---
-        if (
-            mode in [Logger.LOG_MODE_DEBUG, Logger.LOG_MODE_CRITICAL]
-            and self.file_logging_enabled
-        ):
-            if not self.file_handler:  # Próba konfiguracji handlera pliku
-                if not self._configure_file_handler():
-                    if self.console_handler and mode != Logger.LOG_MODE_NONE:
-                        self.warning(
-                            "Nie udało się skonfigurować logowania do pliku.",
-                            stacklevel=Logger.STACKLEVEL + 1,
-                        )  # Kontynuuj, konsola może działać
-        elif (
-            mode in [Logger.LOG_MODE_NONE, Logger.LOG_MODE_INFO]
-            or not self.file_logging_enabled
-        ):
-            # Wyłączanie logowania do pliku jeśli nieodpowiedni tryb lub file_logging_enabled=False
-            if self.file_handler:
-                if self.console_handler and mode != Logger.LOG_MODE_NONE:
-                    self.logger.debug(
-                        "Wyłączanie logowania do pliku z powodu zmiany trybu lub wyłączenia opcji.",
-                        stacklevel=Logger.STACKLEVEL + 1,
-                    )
-                self.logger.removeHandler(self.file_handler)
-                self.file_handler.close()
-                self.file_handler = None
-                self.log_file = None
+        # Jeśli mamy file_handler, ustaw jego poziom
+        if self.file_handler:
+            if mode in [Logger.LOG_MODE_DEBUG, Logger.LOG_MODE_CRITICAL]:
+                self.file_handler.setLevel(logging.DEBUG)
+            else:
+                self.file_handler.setLevel(logging.CRITICAL + 1)
 
         return True
 
