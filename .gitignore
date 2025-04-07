@@ -107,4 +107,7 @@ venv.bak/
 # Project specific
 logs/
 *.log
-example/ 
+example/
+
+# Pliki poprawki
+poprawki.md 
