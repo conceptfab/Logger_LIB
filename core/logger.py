@@ -194,9 +194,7 @@ class Logger:
                         Logger.LOG_MODE_CRITICAL,
                     ]:
                         if not self._configure_file_handler():
-                            init_messages.append(
-                                "Ostrzeżenie: Nie udało się skonfigurować logowania do pliku. Kontynuacja tylko z logowaniem do konsoli."
-                            )
+                            pass  # Usunięto dodawanie ostrzeżenia do init_messages
 
                     # Ustaw właściwy tryb
                     if not self.set_logging_mode(initial_mode):
@@ -231,11 +229,6 @@ class Logger:
                     f"Logger v{Logger.VERSION} zainicjalizowany: tryb={self.logging_mode}, plik={'TAK' if self.file_logging_enabled else 'NIE'}",
                     stacklevel=stack_level_for_init_logs,
                 )
-
-                # Tylko w przypadku ostrzeżeń i błędów, wyświetlamy dodatkowe komunikaty
-                for msg in init_messages:
-                    if "Ostrzeżenie:" in msg or "BŁĄD" in msg:
-                        self.logger.debug(msg, stacklevel=stack_level_for_init_logs)
 
     def _configure_basic_logger(self) -> None:
         """Konfiguruje podstawowe ustawienia loggera."""
@@ -456,7 +449,6 @@ class Logger:
                 and self.file_logging_enabled
             ):
                 if not self.file_handler:
-                    # Tutaj usunięto wyświetlanie ostrzeżenia o niepowodzeniu konfiguracji
                     self._configure_file_handler()
             else:
                 if self.file_handler:
