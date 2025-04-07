@@ -276,7 +276,7 @@ class Logger:
 
         level = logging.INFO
         if mode == Logger.LOG_MODE_NONE:
-            level = logging.CRITICAL + 1
+            level = logging.CRITICAL + 1  # Ustawia poziom wyższy niż CRITICAL
         elif mode == Logger.LOG_MODE_INFO:
             level = logging.INFO
         elif mode == Logger.LOG_MODE_DEBUG:
@@ -432,7 +432,7 @@ class Logger:
         self.logging_mode = mode
 
         # Loguj zmianę jako DEBUG (tylko do konsoli)
-        if self.console_handler:
+        if self.console_handler and old_mode != Logger.LOG_MODE_NONE:
             self.logger.debug(
                 f"Zmieniono tryb logowania z '{old_mode}' na '{mode}'",
                 stacklevel=Logger.STACKLEVEL + 1,
@@ -448,7 +448,7 @@ class Logger:
         ):
             if not self.file_handler:  # Próba konfiguracji handlera pliku
                 if not self._configure_file_handler():
-                    if self.console_handler:
+                    if self.console_handler and mode != Logger.LOG_MODE_NONE:
                         self.warning(
                             "Nie udało się skonfigurować logowania do pliku.",
                             stacklevel=Logger.STACKLEVEL + 1,
@@ -459,7 +459,7 @@ class Logger:
         ):
             # Wyłączanie logowania do pliku jeśli nieodpowiedni tryb lub file_logging_enabled=False
             if self.file_handler:
-                if self.console_handler:
+                if self.console_handler and mode != Logger.LOG_MODE_NONE:
                     self.logger.debug(
                         "Wyłączanie logowania do pliku z powodu zmiany trybu lub wyłączenia opcji.",
                         stacklevel=Logger.STACKLEVEL + 1,
@@ -560,6 +560,9 @@ class Logger:
             append: Jeśli True, dodaje wiadomość do poprzedniej linii bez nowej linii
             **kwargs: Dodatkowe argumenty słownikowe dla logger.debug
         """
+        if self.logging_mode == Logger.LOG_MODE_NONE:
+            return
+
         kwargs["stacklevel"] = kwargs.get("stacklevel", Logger.STACKLEVEL + 1)
         append = kwargs.pop("append", False)
 
@@ -585,11 +588,29 @@ class Logger:
         Args:
             message: Wiadomość do zalogowania
             *args: Dodatkowe argumenty dla logger.info
+            append: Jeśli True, dodaje wiadomość do poprzedniej linii bez nowej linii
             **kwargs: Dodatkowe argumenty słownikowe dla logger.info
         """
+        if self.logging_mode == Logger.LOG_MODE_NONE:
+            return
+
         kwargs["stacklevel"] = kwargs.get("stacklevel", Logger.STACKLEVEL + 1)
+        append = kwargs.pop("append", False)
+
         if self.logger.isEnabledFor(logging.INFO):
-            self.logger.info(message, *args, **kwargs)
+            if append:
+                # Używamy własnego handlera do obsługi append zamiast print
+                if self.console_handler and isinstance(
+                    self.console_handler.stream, io.TextIOWrapper
+                ):
+                    # Wydrukuj tylko samą wiadomość bez formatowania
+                    self.console_handler.stream.write(f"\r{message}")
+                    self.console_handler.stream.flush()
+                else:
+                    # Fallback na print jeśli brak console_handler
+                    print(f"\r{message}", end="", flush=True)
+            else:
+                self.logger.info(message, *args, **kwargs)
 
     def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
         """
@@ -598,11 +619,29 @@ class Logger:
         Args:
             message: Wiadomość do zalogowania
             *args: Dodatkowe argumenty dla logger.warning
+            append: Jeśli True, dodaje wiadomość do poprzedniej linii bez nowej linii
             **kwargs: Dodatkowe argumenty słownikowe dla logger.warning
         """
+        if self.logging_mode == Logger.LOG_MODE_NONE:
+            return
+
         kwargs["stacklevel"] = kwargs.get("stacklevel", Logger.STACKLEVEL + 1)
+        append = kwargs.pop("append", False)
+
         if self.logger.isEnabledFor(logging.WARNING):
-            self.logger.warning(message, *args, **kwargs)
+            if append:
+                # Używamy własnego handlera do obsługi append zamiast print
+                if self.console_handler and isinstance(
+                    self.console_handler.stream, io.TextIOWrapper
+                ):
+                    # Wydrukuj tylko samą wiadomość bez formatowania
+                    self.console_handler.stream.write(f"\r{message}")
+                    self.console_handler.stream.flush()
+                else:
+                    # Fallback na print jeśli brak console_handler
+                    print(f"\r{message}", end="", flush=True)
+            else:
+                self.logger.warning(message, *args, **kwargs)
 
     def error(
         self, message: str, *args: Any, exc_info: bool = False, **kwargs: Any
@@ -613,12 +652,30 @@ class Logger:
         Args:
             message: Wiadomość do zalogowania
             *args: Dodatkowe argumenty dla logger.error
-            exc_info: Jeśli True, dołącza informacje o wyjątku
+            exc_info: Jeśli True, dodaje informacje o wyjątku
+            append: Jeśli True, dodaje wiadomość do poprzedniej linii bez nowej linii
             **kwargs: Dodatkowe argumenty słownikowe dla logger.error
         """
+        if self.logging_mode == Logger.LOG_MODE_NONE:
+            return
+
         kwargs["stacklevel"] = kwargs.get("stacklevel", Logger.STACKLEVEL + 1)
+        append = kwargs.pop("append", False)
+
         if self.logger.isEnabledFor(logging.ERROR):
-            self.logger.error(message, *args, exc_info=exc_info, **kwargs)
+            if append:
+                # Używamy własnego handlera do obsługi append zamiast print
+                if self.console_handler and isinstance(
+                    self.console_handler.stream, io.TextIOWrapper
+                ):
+                    # Wydrukuj tylko samą wiadomość bez formatowania
+                    self.console_handler.stream.write(f"\r{message}")
+                    self.console_handler.stream.flush()
+                else:
+                    # Fallback na print jeśli brak console_handler
+                    print(f"\r{message}", end="", flush=True)
+            else:
+                self.logger.error(message, *args, exc_info=exc_info, **kwargs)
 
     def critical(
         self, message: str, *args: Any, exc_info: bool = False, **kwargs: Any
@@ -629,25 +686,61 @@ class Logger:
         Args:
             message: Wiadomość do zalogowania
             *args: Dodatkowe argumenty dla logger.critical
-            exc_info: Jeśli True, dołącza informacje o wyjątku
+            exc_info: Jeśli True, dodaje informacje o wyjątku
+            append: Jeśli True, dodaje wiadomość do poprzedniej linii bez nowej linii
             **kwargs: Dodatkowe argumenty słownikowe dla logger.critical
         """
+        if self.logging_mode == Logger.LOG_MODE_NONE:
+            return
+
         kwargs["stacklevel"] = kwargs.get("stacklevel", Logger.STACKLEVEL + 1)
+        append = kwargs.pop("append", False)
+
         if self.logger.isEnabledFor(logging.CRITICAL):
-            self.logger.critical(message, *args, exc_info=exc_info, **kwargs)
+            if append:
+                # Używamy własnego handlera do obsługi append zamiast print
+                if self.console_handler and isinstance(
+                    self.console_handler.stream, io.TextIOWrapper
+                ):
+                    # Wydrukuj tylko samą wiadomość bez formatowania
+                    self.console_handler.stream.write(f"\r{message}")
+                    self.console_handler.stream.flush()
+                else:
+                    # Fallback na print jeśli brak console_handler
+                    print(f"\r{message}", end="", flush=True)
+            else:
+                self.logger.critical(message, *args, exc_info=exc_info, **kwargs)
 
     def exception(self, message: str, *args: Any, **kwargs: Any) -> None:
         """
-        Loguje wiadomość na poziomie ERROR wraz z informacją o wyjątku.
+        Loguje wiadomość na poziomie ERROR z informacją o wyjątku.
 
         Args:
             message: Wiadomość do zalogowania
-            *args: Dodatkowe argumenty dla logger.error
-            **kwargs: Dodatkowe argumenty słownikowe dla logger.error
+            *args: Dodatkowe argumenty dla logger.exception
+            append: Jeśli True, dodaje wiadomość do poprzedniej linii bez nowej linii
+            **kwargs: Dodatkowe argumenty słownikowe dla logger.exception
         """
+        if self.logging_mode == Logger.LOG_MODE_NONE:
+            return
+
         kwargs["stacklevel"] = kwargs.get("stacklevel", Logger.STACKLEVEL + 1)
-        # Wywołanie error z exc_info=True
-        self.error(message, *args, exc_info=True, **kwargs)
+        append = kwargs.pop("append", False)
+
+        if self.logger.isEnabledFor(logging.ERROR):
+            if append:
+                # Używamy własnego handlera do obsługi append zamiast print
+                if self.console_handler and isinstance(
+                    self.console_handler.stream, io.TextIOWrapper
+                ):
+                    # Wydrukuj tylko samą wiadomość bez formatowania
+                    self.console_handler.stream.write(f"\r{message}")
+                    self.console_handler.stream.flush()
+                else:
+                    # Fallback na print jeśli brak console_handler
+                    print(f"\r{message}", end="", flush=True)
+            else:
+                self.logger.exception(message, *args, **kwargs)
 
 
 # Niestandardowy formatter, który używa różnych formatów dla różnych poziomów logowania
