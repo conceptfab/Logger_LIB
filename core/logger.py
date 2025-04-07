@@ -371,10 +371,13 @@ class Logger:
             self.file_handler.setFormatter(formatter)
             self.logger.addHandler(self.file_handler)
 
-            self.logger.debug(
-                f"Handler pliku z rotacją skonfigurowany: {self.log_file}",
-                stacklevel=Logger.STACKLEVEL + 1,
-            )
+            # Nie logujemy komunikatu o konfiguracji handlera, będzie on widoczny tylko w konsoli
+            if self.console_handler:
+                self.logger.debug(
+                    f"Handler pliku z rotacją skonfigurowany: {self.log_file}",
+                    stacklevel=Logger.STACKLEVEL + 1,
+                )
+
             return True
         except Exception as e:
             self.critical(
@@ -412,78 +415,51 @@ class Logger:
         Ustawia tryb logowania.
 
         Args:
-            mode: Tryb logowania do ustawienia (LOG_MODE_NONE, LOG_MODE_INFO,
-                  LOG_MODE_DEBUG, LOG_MODE_CRITICAL)
+            mode: Tryb logowania (LOG_MODE_NONE, LOG_MODE_INFO, LOG_MODE_DEBUG, LOG_MODE_CRITICAL)
 
         Returns:
-            bool: True jeśli operacja się powiodła, False w przeciwnym razie
+            bool: True, jeśli operacja się powiodła; False w przeciwnym razie
         """
         if mode == self.logging_mode:
             return True  # Nic się nie zmienia
 
-        # Zapisz stary tryb na wypadek potrzeby przywrócenia
         old_mode = self.logging_mode
-        is_initial_set = old_mode == Logger.LOG_MODE_NONE
+        self.logging_mode = mode
 
-        try:
-            # --- Konfiguracja Handlera Konsoli ---
-            if mode == Logger.LOG_MODE_NONE:
-                if self.console_handler:
-                    self.logger.removeHandler(self.console_handler)
-                    self.console_handler.close()
-                    self.console_handler = None
-            else:
-                if not self.console_handler:
-                    if not self._configure_console_handler():
-                        return False
+        # Loguj zmianę jako DEBUG (tylko do konsoli)
+        if self.console_handler:
+            self.logger.debug(
+                f"Zmieniono tryb logowania z '{old_mode}' na '{mode}'",
+                stacklevel=Logger.STACKLEVEL + 1,
+            )
 
-            # --- Konfiguracja Handlera Pliku ---
-            if self.file_logging_enabled:
-                if not self.file_handler:  # Próba konfiguracji handlera pliku
-                    if not self._configure_file_handler():
+        # Ustaw poziom logowania
+        self._set_logging_level_for_mode(mode)
+
+        # --- Konfiguracja Handlera Pliku ---
+        if self.file_logging_enabled:
+            if not self.file_handler:  # Próba konfiguracji handlera pliku
+                if not self._configure_file_handler():
+                    if self.console_handler:
                         self.warning(
                             "Nie udało się skonfigurować logowania do pliku.",
                             stacklevel=Logger.STACKLEVEL + 1,
                         )  # Kontynuuj, konsola może działać
-            else:  # Logowanie do pliku wyłączone
-                if (
-                    self.file_handler
-                ):  # Wyłączanie logowania do pliku jest logowane jako DEBUG
-                    if (
-                        not is_initial_set
-                    ):  # Loguj tylko przy zmianie trybu, nie przy starcie bez logowania do pliku
-                        self.logger.debug(
-                            "Wyłączanie logowania do pliku.",
-                            stacklevel=Logger.STACKLEVEL + 1,
-                        )
-                    self.logger.removeHandler(self.file_handler)
-                    self.file_handler.close()
-                    self.file_handler = None
-                    self.log_file = None
+        else:  # Logowanie do pliku wyłączone
+            if (
+                self.file_handler
+            ):  # Wyłączanie logowania do pliku jest logowane jako DEBUG
+                if self.console_handler:
+                    self.logger.debug(
+                        "Wyłączanie logowania do pliku.",
+                        stacklevel=Logger.STACKLEVEL + 1,
+                    )
+                self.logger.removeHandler(self.file_handler)
+                self.file_handler.close()
+                self.file_handler = None
+                self.log_file = None
 
-            # --- Ustawienie Poziomu Logowania ---
-            self._set_logging_level_for_mode(mode)
-
-            # --- Aktualizacja Stanu ---
-            self.logging_mode = mode
-
-            # --- Logowanie Zmiany Trybu ---
-            if not is_initial_set:  # Nie loguj przy pierwszym ustawieniu
-                self.logger.debug(
-                    f"Zmieniono tryb logowania z '{old_mode}' na '{mode}'",
-                    stacklevel=Logger.STACKLEVEL + 1,
-                )
-
-            return True
-
-        except Exception as e:
-            # Przywróć stary tryb w przypadku błędu
-            self.logging_mode = old_mode
-            self.error(
-                f"Błąd podczas zmiany trybu logowania: {str(e)}",
-                stacklevel=Logger.STACKLEVEL + 1,
-            )
-            return False
+        return True
 
     def set_file_logging(self, enabled: bool) -> bool:
         """
@@ -501,28 +477,31 @@ class Logger:
         old_state = self.file_logging_enabled
         self.file_logging_enabled = enabled
 
-        # Loguj zmianę jako DEBUG
-        self.logger.debug(
-            f"Zmieniono logowanie do pliku z '{old_state}' na '{enabled}'",
-            stacklevel=Logger.STACKLEVEL + 1,
-        )
+        # Loguj zmianę jako DEBUG (tylko do konsoli)
+        if self.console_handler:
+            self.logger.debug(
+                f"Zmieniono logowanie do pliku z '{old_state}' na '{enabled}'",
+                stacklevel=Logger.STACKLEVEL + 1,
+            )
 
         # Aktualizuj handler pliku
         if enabled:
             if not self.file_handler:
                 if not self._configure_file_handler():
                     self.file_logging_enabled = old_state  # Przywróć stary stan
-                    self.error(
-                        "Nie udało się skonfigurować logowania do pliku.",
-                        stacklevel=Logger.STACKLEVEL + 1,
-                    )
+                    if self.console_handler:
+                        self.error(
+                            "Nie udało się skonfigurować logowania do pliku.",
+                            stacklevel=Logger.STACKLEVEL + 1,
+                        )
                     return False
         else:
             if self.file_handler:
-                self.logger.debug(
-                    "Wyłączanie logowania do pliku.",
-                    stacklevel=Logger.STACKLEVEL + 1,
-                )
+                if self.console_handler:
+                    self.logger.debug(
+                        "Wyłączanie logowania do pliku.",
+                        stacklevel=Logger.STACKLEVEL + 1,
+                    )
                 self.logger.removeHandler(self.file_handler)
                 self.file_handler.close()
                 self.file_handler = None
