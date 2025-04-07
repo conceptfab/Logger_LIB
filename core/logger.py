@@ -100,7 +100,7 @@ class Logger:
         "✖✖ %(levelname)-7s: %(filename)s:%(lineno)d → %(message)s"
     )
     CONSOLE_FORMAT_CRITICAL: ClassVar[str] = (
-        "%(asctime)s ⚠⚠⚠ %(levelname)-7s: %(filename)s:%(lineno)d → %(message)s"
+        "⚠⚠⚠ CRITICAL [%(asctime)s]: %(filename)s:%(lineno)d → %(message)s"
     )
     FILE_FORMAT: ClassVar[str] = (
         "%(asctime)s | %(levelname)-7s | %(filename)s:%(lineno)d | %(message)s"
@@ -313,7 +313,7 @@ class Logger:
             self.console_handler = logging.StreamHandler(sys.stdout)
             self.console_handler.setLevel(logging.DEBUG)  # Poziom zostanie dostosowany
 
-            # Używamy niestandardowego formatera, który dobierze format na podstawie poziomu
+            # Zmodyfikowany formatter z poprawionym obsługiwaniem formatu daty
             self.console_handler.setFormatter(
                 LevelSpecificFormatter(
                     info_fmt=Logger.CONSOLE_FORMAT_INFO,
