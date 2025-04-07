@@ -133,12 +133,9 @@ class Logger:
         is_init_successful = True
 
         try:
-            # Dodaj więcej szczegółowego debugowania
             script_dir = os.path.dirname(os.path.abspath(__file__))
-            print(f"[DEBUG] Script directory: {script_dir}")  # Wydruk ścieżki skryptu
-            print(f"[DEBUG] Pliki w katalogu: {os.listdir(script_dir)}")  # Lista plików
 
-            # Sprawdzenie plików kontrolnych z bardziej szczegółowym logowaniem
+            # Sprawdzenie plików kontrolnych
             level_files = {
                 "INFO": Logger.LOG_MODE_INFO,
                 "DEBUG": Logger.LOG_MODE_DEBUG,
@@ -152,29 +149,23 @@ class Logger:
                 # Sprawdzaj zarówno plik bez sufiksu, jak i z sufiksem _LOG
                 for suffix in ["", Logger.LOG_FILE_SUFFIX]:
                     filepath = os.path.join(script_dir, filename + suffix)
-                    print(f"[DEBUG] Sprawdzanie pliku: {filepath}")
-
                     try:
                         if os.path.isfile(filepath) and os.path.getsize(filepath) == 0:
-                            print(f"[DEBUG] Znaleziono plik kontrolny: {filepath}")
                             initial_mode = mode
                             file_logging_enabled = suffix == Logger.LOG_FILE_SUFFIX
                             break
-                    except Exception as e:
-                        print(f"[DEBUG] Błąd podczas sprawdzania pliku {filepath}: {e}")
+                    except Exception:
+                        pass
 
-            init_messages.append(f"Początkowy tryb logowania: {initial_mode}")
+            # Zwięzły komunikat inicjalizacyjny
             init_messages.append(
-                f"Logowanie do pliku: {'WŁĄCZONE' if file_logging_enabled else 'WYŁĄCZONE'}"
+                f"Logger v{Logger.VERSION} skonfigurowany: tryb={initial_mode}, plik={'TAK' if file_logging_enabled else 'NIE'}"
             )
 
             self.logger = logging.getLogger("logger")
             self.log_file: Optional[str] = None
             self.console_handler: Optional[logging.Handler] = None
             self.file_handler: Optional[logging.Handler] = None
-
-            # Dodaj informację o wersji do komunikatów inicjalizacyjnych
-            init_messages.append(f"Inicjalizacja Logger_LIB wersja {Logger.VERSION}")
 
             self.log_dir = os.path.join(
                 os.path.dirname(script_dir), Logger.LOG_DIRECTORY
@@ -183,13 +174,6 @@ class Logger:
             # Ustawienie zmiennej klasowej i instancji
             Logger.FILE_LOGGING_ENABLED = file_logging_enabled
             self.file_logging_enabled = file_logging_enabled
-            init_messages.append(
-                f"Logowanie do pliku jest {'WŁĄCZONE' if file_logging_enabled else 'WYŁĄCZONE'}."
-            )
-
-            init_messages.append(
-                f"Początkowy tryb logowania ({initial_mode}) ustalony na podstawie: {file_logging_enabled}."
-            )
 
             self._configure_basic_logger()
             self.logging_mode = Logger.LOG_MODE_NONE  # Tymczasowo
@@ -213,7 +197,6 @@ class Logger:
                             init_messages.append(
                                 "Ostrzeżenie: Nie udało się skonfigurować logowania do pliku. Kontynuacja tylko z logowaniem do konsoli."
                             )
-                            # Brak file_handler nie jest krytycznym błędem
 
                     # Ustaw właściwy tryb
                     if not self.set_logging_mode(initial_mode):
@@ -223,9 +206,6 @@ class Logger:
             else:
                 # Jeśli tryb początkowy to NONE, zapisujemy stan
                 self.logging_mode = Logger.LOG_MODE_NONE
-                init_messages.append(
-                    "Tryb logowania ustawiony na NONE (0). Logowanie wyłączone."
-                )
 
         except Exception as e:
             is_init_successful = False
@@ -233,7 +213,6 @@ class Logger:
             init_messages.append(
                 f"KRYTYCZNY BŁĄD podczas inicjalizacji Loggera: {str(e)}"
             )
-            # Użyj print jako ostatniej deski ratunku
             print(f"KRYTYCZNY BŁĄD podczas inicjalizacji Loggera: {str(e)}")
             print(traceback.format_exc())
         finally:
@@ -242,31 +221,21 @@ class Logger:
 
             # Logowanie zebranych komunikatów inicjalizacyjnych
             if critical_error:
-                # Użyj print jako ostateczności
                 print("KRYTYCZNY BŁĄD Loggera: Logger nie będzie działał poprawnie.")
                 print("Zebrane komunikaty inicjalizacyjne:")
                 for msg in init_messages:
                     print(f"  [INIT] {msg}")
-            elif (
-                self.logging_mode in [Logger.LOG_MODE_DEBUG, Logger.LOG_MODE_CRITICAL]
-                and self.logger.hasHandlers()
-            ):
-                # Loguj tylko w trybach DEBUG/CRITICAL
+            elif not critical_error and self.logger.hasHandlers():
                 stack_level_for_init_logs = Logger.STACKLEVEL + 1
                 self.logger.debug(
-                    "--- Rozpoczęcie logów inicjalizacji Loggera ---",
+                    f"Logger v{Logger.VERSION} zainicjalizowany: tryb={self.logging_mode}, plik={'TAK' if self.file_logging_enabled else 'NIE'}, katalog={self.log_dir}",
                     stacklevel=stack_level_for_init_logs,
                 )
+
+                # Tylko w przypadku ostrzeżeń i błędów, wyświetlamy dodatkowe komunikaty
                 for msg in init_messages:
-                    self.logger.debug(msg, stacklevel=stack_level_for_init_logs)
-                self.logger.debug(
-                    f"Inicjalizacja Loggera zakończona. Finalny tryb: {self.logging_mode}.",
-                    stacklevel=stack_level_for_init_logs,
-                )
-                self.logger.debug(
-                    "--- Koniec logów inicjalizacji Loggera ---",
-                    stacklevel=stack_level_for_init_logs,
-                )
+                    if "Ostrzeżenie:" in msg or "BŁĄD" in msg:
+                        self.logger.debug(msg, stacklevel=stack_level_for_init_logs)
 
     def _configure_basic_logger(self) -> None:
         """Konfiguruje podstawowe ustawienia loggera."""
@@ -363,57 +332,40 @@ class Logger:
 
     def _configure_file_handler(self) -> bool:
         """Konfiguruje handler pliku z rotacją. Zwraca True w przypadku sukcesu."""
-        # Sprawdzenie czy logowanie do pliku jest włączone
-        if not self.file_logging_enabled:
-            return False
-
-        if not self._ensure_log_directory():
-            return False
-
         try:
-            log_filename = f"{Logger.LOG_FILENAME_PREFIX}.log"
-            self.log_file = os.path.join(self.log_dir, log_filename)
-
-            formatter = logging.Formatter(
-                fmt=Logger.FILE_FORMAT, datefmt=Logger.LOG_DATE_FORMAT
-            )
-
-            # Dodaj obsługę przypadku, gdy katalog istnieje, ale nie ma uprawnień zapisu
-            if not os.access(self.log_dir, os.W_OK):
-                self.error(
-                    f"Brak uprawnień do zapisu w katalogu logów: {self.log_dir}",
-                    stacklevel=Logger.STACKLEVEL + 2,
-                )
+            if not self._ensure_log_directory():
                 return False
 
-            # Użycie TimedRotatingFileHandler zamiast zwykłego FileHandler
+            # Tworzenie pełnej ścieżki do pliku logu
+            self.log_file = os.path.join(
+                self.log_dir,
+                f"{Logger.LOG_FILENAME_PREFIX}.log",
+            )
+
+            # Konfiguracja handlera pliku z rotacją dzienną
             self.file_handler = logging.handlers.TimedRotatingFileHandler(
                 self.log_file,
-                when="midnight",  # Rotacja o północy
-                interval=1,  # Co jeden dzień
-                backupCount=7,  # Zachowaj 7 ostatnich plików
+                when="midnight",
+                interval=1,
+                backupCount=7,
                 encoding="utf-8",
             )
 
-            # Format nazwy po rotacji: log.log.YYYY-MM-DD
-            self.file_handler.suffix = "%Y-%m-%d"
+            # Ustawienie formatera dla pliku
+            file_formatter = logging.Formatter(
+                Logger.FILE_FORMAT, datefmt=Logger.LOG_DATE_FORMAT
+            )
+            self.file_handler.setFormatter(file_formatter)
 
-            # Ustaw poziom zawsze na DEBUG, aby rejestrować wszystkie komunikaty
-            self.file_handler.setLevel(logging.DEBUG)
-
-            self.file_handler.setFormatter(formatter)
+            # Dodanie handlera do loggera
             self.logger.addHandler(self.file_handler)
 
             return True
         except Exception as e:
-            self.critical(
-                f"Nie można skonfigurować logowania do pliku ({self.log_file if hasattr(self, 'log_file') else 'brak ścieżki'}). Błąd: {e}",
-                exc_info=True,
-                stacklevel=Logger.STACKLEVEL + 2,
+            self.logger.error(
+                f"Błąd podczas konfiguracji handlera pliku: {str(e)}",
+                stacklevel=Logger.STACKLEVEL + 1,
             )
-            if self.file_handler and self.file_handler in self.logger.handlers:
-                self.logger.removeHandler(self.file_handler)
-            self.file_handler = None
             return False
 
     def _ensure_log_directory(self) -> bool:
