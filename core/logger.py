@@ -67,7 +67,7 @@ class Logger:
     # Stałe konfiguracyjne jako ClassVar
     _instance: ClassVar[Optional["Logger"]] = None
     _initialized: ClassVar[bool] = False
-    VERSION: ClassVar[str] = "0.21"
+    VERSION: ClassVar[str] = "0.22"
 
     # Stałe konfiguracyjne
     LOG_MODE_NONE: ClassVar[int] = 0
@@ -354,6 +354,14 @@ class Logger:
                 fmt=Logger.FILE_FORMAT, datefmt=Logger.LOG_DATE_FORMAT
             )
 
+            # Dodaj obsługę przypadku, gdy katalog istnieje, ale nie ma uprawnień zapisu
+            if not os.access(self.log_dir, os.W_OK):
+                self.error(
+                    f"Brak uprawnień do zapisu w katalogu logów: {self.log_dir}",
+                    stacklevel=Logger.STACKLEVEL + 2,
+                )
+                return False
+
             # Użycie TimedRotatingFileHandler zamiast zwykłego FileHandler
             self.file_handler = logging.handlers.TimedRotatingFileHandler(
                 self.log_file,
@@ -371,13 +379,6 @@ class Logger:
 
             self.file_handler.setFormatter(formatter)
             self.logger.addHandler(self.file_handler)
-
-            # Nie logujemy komunikatu o konfiguracji handlera, będzie on widoczny tylko w konsoli
-            if self.console_handler:
-                self.logger.debug(
-                    f"Handler pliku z rotacją skonfigurowany: {self.log_file}",
-                    stacklevel=Logger.STACKLEVEL + 1,
-                )
 
             return True
         except Exception as e:
@@ -554,17 +555,12 @@ class Logger:
     def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
         """
         Loguje wiadomość na poziomie DEBUG.
-
-        Args:
-            message: Wiadomość do zalogowania
-            *args: Dodatkowe argumenty dla logger.debug
-            append: Jeśli True, dodaje wiadomość do poprzedniej linii bez nowej linii
-            **kwargs: Dodatkowe argumenty słownikowe dla logger.debug
         """
         if self.logging_mode in [Logger.LOG_MODE_NONE, Logger.LOG_MODE_INFO]:
             return  # Nie pokazuj DEBUG w trybie NONE ani INFO
 
-        kwargs["stacklevel"] = kwargs.get("stacklevel", Logger.STACKLEVEL + 1)
+        # Poprawne ustawienie stacklevel
+        kwargs["stacklevel"] = kwargs.get("stacklevel", Logger.STACKLEVEL)
         append = kwargs.pop("append", False)
 
         if append:
@@ -755,16 +751,37 @@ class LevelSpecificFormatter(logging.Formatter):
         datefmt=None,
     ):
         super().__init__(datefmt=datefmt)
-        self.formatters = {
-            logging.INFO: logging.Formatter(fmt=info_fmt, datefmt=datefmt),
-            logging.DEBUG: logging.Formatter(fmt=debug_fmt, datefmt=datefmt),
-            logging.WARNING: logging.Formatter(fmt=warning_fmt, datefmt=datefmt),
-            logging.ERROR: logging.Formatter(fmt=error_fmt, datefmt=datefmt),
-            logging.CRITICAL: logging.Formatter(fmt=critical_fmt, datefmt=datefmt),
-        }
+        self.formatters = {}
+
+        # Upewnij się, że wszystkie formaty są prawidłowo ustawione
+        if info_fmt:
+            self.formatters[logging.INFO] = logging.Formatter(
+                fmt=info_fmt, datefmt=datefmt
+            )
+        if debug_fmt:
+            self.formatters[logging.DEBUG] = logging.Formatter(
+                fmt=debug_fmt, datefmt=datefmt
+            )
+        if warning_fmt:
+            self.formatters[logging.WARNING] = logging.Formatter(
+                fmt=warning_fmt, datefmt=datefmt
+            )
+        if error_fmt:
+            self.formatters[logging.ERROR] = logging.Formatter(
+                fmt=error_fmt, datefmt=datefmt
+            )
+        if critical_fmt:
+            self.formatters[logging.CRITICAL] = logging.Formatter(
+                fmt=critical_fmt, datefmt=datefmt
+            )
+
+        # Format domyślny dla poziomów, które nie mają zdefiniowanego formatu
+        self.default_formatter = logging.Formatter(
+            fmt=info_fmt or "%(message)s", datefmt=datefmt
+        )
 
     def format(self, record):
-        formatter = self.formatters.get(record.levelno, self.formatters[logging.INFO])
+        formatter = self.formatters.get(record.levelno, self.default_formatter)
         return formatter.format(record)
 
 
