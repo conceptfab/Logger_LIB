@@ -188,6 +188,8 @@ class Logger:
                         f"Ostrzeżenie: Niespodziewany błąd podczas sprawdzania pliku '{filepath}': {e}."
                     )
 
+            # Ustawienie zmiennej klasowej i instancji
+            Logger.FILE_LOGGING_ENABLED = file_logging_enabled
             self.file_logging_enabled = file_logging_enabled
             init_messages.append(
                 f"Logowanie do pliku jest {'WŁĄCZONE' if file_logging_enabled else 'WYŁĄCZONE'}."
