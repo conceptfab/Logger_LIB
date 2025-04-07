@@ -228,7 +228,7 @@ class Logger:
             elif not critical_error and self.logger.hasHandlers():
                 stack_level_for_init_logs = Logger.STACKLEVEL + 1
                 self.logger.debug(
-                    f"Logger v{Logger.VERSION} zainicjalizowany: tryb={self.logging_mode}, plik={'TAK' if self.file_logging_enabled else 'NIE'}, katalog={self.log_dir}",
+                    f"Logger v{Logger.VERSION} zainicjalizowany: tryb={self.logging_mode}, plik={'TAK' if self.file_logging_enabled else 'NIE'}",
                     stacklevel=stack_level_for_init_logs,
                 )
 
@@ -333,6 +333,10 @@ class Logger:
     def _configure_file_handler(self) -> bool:
         """Konfiguruje handler pliku z rotacją. Zwraca True w przypadku sukcesu."""
         try:
+            # Sprawdzenie czy logowanie do pliku jest włączone
+            if not self.file_logging_enabled:
+                return False
+
             if not self._ensure_log_directory():
                 return False
 
@@ -447,11 +451,15 @@ class Logger:
                         )
 
             # Konfiguracja handlera pliku
-            if mode in [Logger.LOG_MODE_DEBUG, Logger.LOG_MODE_CRITICAL]:
-                if not self.file_handler and self.file_logging_enabled:
+            if (
+                mode in [Logger.LOG_MODE_DEBUG, Logger.LOG_MODE_CRITICAL]
+                and self.file_logging_enabled
+            ):
+                if not self.file_handler:
                     if not self._configure_file_handler():
-                        print(
-                            "Ostrzeżenie: Nie udało się skonfigurować logowania do pliku"
+                        self.logger.warning(
+                            "Nie udało się skonfigurować logowania do pliku",
+                            stacklevel=Logger.STACKLEVEL + 1,
                         )
             else:
                 if self.file_handler:
