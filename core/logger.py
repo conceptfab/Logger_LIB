@@ -456,11 +456,8 @@ class Logger:
                 and self.file_logging_enabled
             ):
                 if not self.file_handler:
-                    if not self._configure_file_handler():
-                        self.logger.warning(
-                            "Nie udało się skonfigurować logowania do pliku",
-                            stacklevel=Logger.STACKLEVEL + 1,
-                        )
+                    # Tutaj usunięto wyświetlanie ostrzeżenia o niepowodzeniu konfiguracji
+                    self._configure_file_handler()
             else:
                 if self.file_handler:
                     self.logger.removeHandler(self.file_handler)
@@ -470,54 +467,6 @@ class Logger:
         except Exception as e:
             print(f"Błąd podczas ustawiania trybu logowania: {str(e)}")
             return False
-
-    def set_file_logging(self, enabled: bool) -> bool:
-        """
-        Włącza lub wyłącza logowanie do pliku.
-
-        Args:
-            enabled: True, aby włączyć logowanie do pliku; False, aby wyłączyć
-
-        Returns:
-            bool: True, jeśli operacja się powiodła; False w przeciwnym razie
-        """
-        if enabled == self.file_logging_enabled:
-            return True  # Nic się nie zmienia
-
-        old_state = self.file_logging_enabled
-        self.file_logging_enabled = enabled
-
-        # Loguj zmianę jako DEBUG (tylko do konsoli)
-        if self.console_handler:
-            self.logger.debug(
-                f"Zmieniono logowanie do pliku z '{old_state}' na '{enabled}'",
-                stacklevel=Logger.STACKLEVEL + 1,
-            )
-
-        # Aktualizuj handler pliku
-        if enabled:
-            if not self.file_handler:
-                if not self._configure_file_handler():
-                    self.file_logging_enabled = old_state  # Przywróć stary stan
-                    if self.console_handler:
-                        self.error(
-                            "Nie udało się skonfigurować logowania do pliku.",
-                            stacklevel=Logger.STACKLEVEL + 1,
-                        )
-                    return False
-        else:
-            if self.file_handler:
-                if self.console_handler:
-                    self.logger.debug(
-                        "Wyłączanie logowania do pliku.",
-                        stacklevel=Logger.STACKLEVEL + 1,
-                    )
-                self.logger.removeHandler(self.file_handler)
-                self.file_handler.close()
-                self.file_handler = None
-                self.log_file = None
-
-        return True
 
     def close(self) -> None:
         """
