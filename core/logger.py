@@ -689,8 +689,8 @@ class Logger:
             append: Jeśli True, dodaje wiadomość do poprzedniej linii bez nowej linii
             **kwargs: Dodatkowe argumenty słownikowe dla logger.critical
         """
-        if self.logging_mode in [Logger.LOG_MODE_NONE, Logger.LOG_MODE_INFO]:
-            return  # Nie pokazuj CRITICAL w trybie NONE ani INFO
+        if self.logging_mode == Logger.LOG_MODE_NONE:
+            return  # Nie pokazuj CRITICAL tylko w trybie NONE
 
         kwargs["stacklevel"] = kwargs.get("stacklevel", Logger.STACKLEVEL + 1)
         append = kwargs.pop("append", False)
