@@ -366,15 +366,8 @@ class Logger:
             # Format nazwy po rotacji: log.log.YYYY-MM-DD
             self.file_handler.suffix = "%Y-%m-%d"
 
-            # Ustaw poziom na podstawie aktualnego trybu logowania
-            if self.logging_mode in [
-                Logger.LOG_MODE_INFO,
-                Logger.LOG_MODE_DEBUG,
-                Logger.LOG_MODE_CRITICAL,
-            ]:
-                self.file_handler.setLevel(logging.DEBUG)
-            else:
-                self.file_handler.setLevel(logging.CRITICAL + 1)
+            # Ustaw poziom zawsze na DEBUG, aby rejestrować wszystkie komunikaty
+            self.file_handler.setLevel(logging.DEBUG)
 
             self.file_handler.setFormatter(formatter)
             self.logger.addHandler(self.file_handler)
@@ -433,6 +426,9 @@ class Logger:
 
             # Użyj mode = Logger.LOG_MODE_NONE jako wartości domyślnej, jeśli nie znajdziemy plików
             mode = Logger.LOG_MODE_NONE
+            file_logging = (
+                False  # Dodana zmienna do śledzenia czy włączyć logowanie do pliku
+            )
 
             for filename, new_mode in level_files.items():
                 for suffix in ["", Logger.LOG_FILE_SUFFIX]:
@@ -441,10 +437,13 @@ class Logger:
                         if os.path.isfile(filepath) and os.path.getsize(filepath) == 0:
                             print(f"[DEBUG] Znaleziono plik kontrolny: {filepath}")
                             mode = new_mode
-                            self.set_file_logging(suffix == Logger.LOG_FILE_SUFFIX)
-                            break
+                            file_logging = suffix == Logger.LOG_FILE_SUFFIX
+                            # Nie przerywaj pętli, sprawdź wszystkie pliki
                     except Exception as e:
                         print(f"[DEBUG] Błąd podczas sprawdzania pliku {filepath}: {e}")
+
+            # Ustaw logowanie do pliku po sprawdzeniu wszystkich plików
+            self.set_file_logging(file_logging)
 
         # Ustaw nowy tryb logowania
         self.logging_mode = mode
@@ -462,18 +461,14 @@ class Logger:
 
         # Jeśli mamy file_handler, ustaw jego poziom
         if self.file_handler:
-            if (
-                mode
-                in [
-                    Logger.LOG_MODE_INFO,
-                    Logger.LOG_MODE_DEBUG,
-                    Logger.LOG_MODE_CRITICAL,
-                ]
-                and self.file_logging_enabled
-            ):
+            # Jeśli włączone logowanie do pliku, aktywuj je niezależnie od trybu logowania
+            if self.file_logging_enabled:
                 self.file_handler.setLevel(logging.DEBUG)
             else:
                 self.file_handler.setLevel(logging.CRITICAL + 1)
+        # Jeśli nie mamy file_handler, ale logowanie do pliku jest włączone, spróbuj go skonfigurować
+        elif self.file_logging_enabled:
+            self._configure_file_handler()
 
         return True
 
